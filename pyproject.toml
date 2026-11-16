@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "saani"
-version = "1.1.0"
+version = "1.2.0"
 description = "Saani - a personal multi-agent AI system that works on your computer the way you would."
 readme = "README.md"
 requires-python = ">=3.10"

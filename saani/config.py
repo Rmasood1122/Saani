@@ -28,6 +28,11 @@ DEFAULTS: dict[str, Any] = {
         "max_tokens": 16000,
         "timeout_s": 600,
         "max_retries": 4,
+        # Your own model (the saanimind project). provider "own" sends everything to it;
+        # otherwise `tiers` lists which tiers it handles, e.g. ["fast"], while the main provider does the rest.
+        "own": {"base_url": "http://127.0.0.1:8900/v1", "model": "saanimind", "tiers": []},
+        # Save every model exchange (secrets scrubbed) under ~/.saani/traces as training data for your own model.
+        "record_traces": False,
     },
     "limits": {
         "max_agents": 8,
@@ -109,6 +114,8 @@ class Config:
     def trash(self) -> Path: return self.home / "trash"
     @property
     def logs(self) -> Path: return self.home / "logs"
+    @property
+    def traces_dir(self) -> Path: return self.home / "traces"
 
     def ensure_dirs(self) -> None:
         for d in (self.home, self.skills_dir, self.agents_dir, self.tools_dir,

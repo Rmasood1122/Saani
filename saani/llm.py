@@ -329,17 +329,58 @@ class Budget:
             self.output_tokens += resp.output_tokens
 
 
-class LLMRouter:
-    """Maps a tier (planner / worker / fast) to a model and applies the last-line secret scrub."""
+class TraceRecorder:
+    """Appends every model call (after the secret scrub) to a JSONL file, one file per day.
 
-    def __init__(self, client: LLMClient, models: dict | None = None, max_tokens: int = 16000, redactor=None):
+    These traces are the training data for your own model (see the saanimind project):
+    what the system prompt was, what the conversation looked like, which tools were
+    offered and what the model answered. Off unless `llm.record_traces` is true.
+    """
+
+    def __init__(self, folder):
+        self.folder = folder
+        self._lock = threading.Lock()
+
+    def record(self, *, tier: str, model: str, system: str, messages: list[Msg],
+               tools: list[dict] | None, resp: LLMResponse) -> None:
+        rec = {
+            "ts": time.time(), "tier": tier, "model": model, "system": system,
+            "messages": [{"role": m.role, "content": m.content,
+                          "tool_calls": [{"id": c.id, "name": c.name, "args": c.args} for c in m.tool_calls],
+                          "tool_call_id": m.tool_call_id, "is_error": m.is_error} for m in messages],
+            "tools": [{"name": t["name"], "description": t.get("description", ""),
+                       "input_schema": t.get("input_schema") or {}} for t in (tools or [])],
+            "response": {"text": resp.text, "stop_reason": resp.stop_reason,
+                         "tool_calls": [{"id": c.id, "name": c.name, "args": c.args} for c in resp.tool_calls]},
+        }
+        line = json.dumps(rec, ensure_ascii=False, default=str)
+        path = os.path.join(str(self.folder), time.strftime("%Y-%m-%d") + ".jsonl")
+        with self._lock:
+            os.makedirs(str(self.folder), exist_ok=True)
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(line + "\n")
+
+
+class LLMRouter:
+    """Maps a tier (planner / worker / fast) to a client and model, applies the last-line
+    secret scrub, and optionally records the exchange for training your own model."""
+
+    def __init__(self, client: LLMClient, models: dict | None = None, max_tokens: int = 16000, redactor=None,
+                 tier_clients: dict[str, tuple[LLMClient, str]] | None = None, recorder: TraceRecorder | None = None):
         self.client = client
         self.models = models or {}
         self.max_tokens = max_tokens
         self.redactor = redactor
+        self.tier_clients = tier_clients or {}     # tier -> (client, model name) overrides
+        self.recorder = recorder
 
     def model_for(self, tier: str) -> str:
+        if tier in self.tier_clients:
+            return self.tier_clients[tier][1]
         return self.models.get(tier) or self.models.get("worker") or ""
+
+    def client_for(self, tier: str) -> LLMClient:
+        return self.tier_clients[tier][0] if tier in self.tier_clients else self.client
 
     def complete(self, *, tier: str = "worker", budget: Budget | None = None, system: str,
                  messages: list[Msg], tools: list[dict] | None = None,
@@ -349,11 +390,18 @@ class LLMRouter:
         if self.redactor:
             system = self.redactor.redact(system)
             messages = [replace(m, content=self.redactor.redact(m.content)) if m.content else m for m in messages]
-        resp = self.client.complete(system=system, messages=messages, tools=tools,
-                                    model=self.model_for(tier), max_tokens=self.max_tokens,
-                                    force_tool=force_tool)
+        model = self.model_for(tier)
+        resp = self.client_for(tier).complete(system=system, messages=messages, tools=tools,
+                                              model=model, max_tokens=self.max_tokens,
+                                              force_tool=force_tool)
         if budget:
             budget.add(resp)
+        if self.recorder is not None:
+            try:
+                out = resp if not self.redactor else replace(resp, text=self.redactor.redact(resp.text))
+                self.recorder.record(tier=tier, model=model, system=system, messages=messages, tools=tools, resp=out)
+            except OSError:
+                pass
         return resp
 
     def structured(self, *, tool: dict, tier: str, budget: Budget | None, system: str, messages: list[Msg]) -> dict | None:
@@ -388,4 +436,22 @@ def make_client(config, vault=None) -> LLMClient:
         if not key and (not base or "api.openai.com" in base):
             raise LLMError(f"No API key. Run `saani init`, or set the {key_env} environment variable.")
         return OpenAICompatClient(key, base, timeout, retries)
-    raise LLMError(f"unknown llm.provider '{provider}' (use anthropic, openai or demo)")
+    if provider == "own":
+        return own_model_client(config)
+    raise LLMError(f"unknown llm.provider '{provider}' (use anthropic, openai, own or demo)")
+
+
+def own_model_client(config) -> LLMClient:
+    """Your own model, served by the saanimind project on this machine (OpenAI chat dialect, no key)."""
+    base = config.get("llm.own.base_url", "http://127.0.0.1:8900/v1")
+    return OpenAICompatClient("", base, config.get("llm.timeout_s", 300), config.get("llm.max_retries", 4))
+
+
+def own_model_tiers(config) -> dict[str, tuple[LLMClient, str]]:
+    """Tier overrides that send some tiers to your own model while another provider handles the rest."""
+    tiers = config.get("llm.own.tiers", []) or []
+    if config.get("llm.provider") == "own" or not tiers:
+        return {}
+    client = own_model_client(config)
+    model = config.get("llm.own.model", "saanimind")
+    return {t: (client, model) for t in tiers if t in ("planner", "worker", "fast")}

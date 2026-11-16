@@ -12,6 +12,18 @@ from .security.audit import AuditLog
 from .security.secrets import Vault
 
 
+def own_model_up(base_url: str, timeout: float = 2.0) -> bool:
+    """True when a saanimind server answers at base_url (its /v1/models endpoint)."""
+    import urllib.request
+    try:
+        req = urllib.request.Request(base_url.rstrip("/") + "/models")
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(req, timeout=timeout) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
 def run_checks(config) -> list[tuple[str, str, str]]:
     """Returns (status, name, detail) where status is ok | warn | fail."""
     out: list[tuple[str, str, str]] = []
@@ -31,7 +43,19 @@ def run_checks(config) -> list[tuple[str, str, str]]:
     vault = Vault(config.home)
     env = config.get("llm.api_key_env", "")
     has_key = bool(os.environ.get(env) or vault.get(env)) if env else False
-    if provider == "demo":
+    own_tiers = config.get("llm.own.tiers", []) or []
+    if provider == "own" or own_tiers:
+        base = config.get("llm.own.base_url", "http://127.0.0.1:8900/v1")
+        up = own_model_up(base)
+        what = "all tiers" if provider == "own" else "tiers " + ", ".join(own_tiers)
+        add(up, "Own model", f"saanimind at {base} ({what}): {'running' if up else 'NOT running - start it with `saanimind serve`'}",
+            warn=provider != "own")
+    if config.get("llm.record_traces"):
+        n = sum(1 for p in config.traces_dir.glob("*.jsonl")) if config.traces_dir.exists() else 0
+        add(True, "Training traces", f"recording to {config.traces_dir} ({n} day file(s))")
+    if provider == "own":
+        pass                                   # covered by the "Own model" line above
+    elif provider == "demo":
         add(False, "Model", "demo mode - no real model connected. Run `saani init`.", warn=True)
     elif provider == "openai" and config.get("llm.base_url") and "api.openai.com" not in config.get("llm.base_url"):
         add(True, "Model", f"OpenAI-compatible endpoint {config.get('llm.base_url')} (models: {config.get('llm.models')})")

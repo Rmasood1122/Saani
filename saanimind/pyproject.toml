@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "saanimind"
+version = "0.1.0"
+description = "Your own language model, built from scratch, that plugs into Saani as a provider."
+requires-python = ">=3.10"
+dependencies = ["torch>=2.1", "numpy>=1.24"]
+
+[project.scripts]
+saanimind = "saanimind.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["saanimind*"]

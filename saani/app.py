@@ -7,7 +7,7 @@ from typing import Any
 from .config import Config
 from .events import EventBus
 from .interaction import DenyInteraction, Interaction
-from .llm import LLMClient, LLMRouter, make_client
+from .llm import LLMClient, LLMRouter, TraceRecorder, make_client, own_model_tiers
 from .memory import Store
 from .persona import Persona
 from .security.audit import AuditLog
@@ -61,7 +61,9 @@ def build(config: Config | None = None, interaction: Interaction | None = None,
             tools.register(t)
     forge.load_custom_tools(tools, config.tools_dir)
     client = client or make_client(config, vault)
-    llm = LLMRouter(client, config.get("llm.models", {}), config.get("llm.max_tokens", 16000), redactor)
+    recorder = TraceRecorder(config.traces_dir) if config.get("llm.record_traces", False) else None
+    llm = LLMRouter(client, config.get("llm.models", {}), config.get("llm.max_tokens", 16000), redactor,
+                    tier_clients=own_model_tiers(config), recorder=recorder)
     persona = Persona(config.persona_path, config.get("user_name", ""))
     persona.ensure()
     return Services(config=config, store=Store(config.db_path), vault=vault, redactor=redactor,

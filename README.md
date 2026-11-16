@@ -26,6 +26,13 @@ python3 -m venv .venv
 
 The voice extra needs Python 3.12 or 3.13 on Windows at the moment (some speech packages have no ready-made builds for newer Python yet). On a newer Python, install the core and the other extras, and leave voice off.
 
+### Your own model
+
+Saani can also run on a model you train yourself. The [saanimind](saanimind/README.md) project
+builds one from scratch and serves it locally; Saani uses it through provider option 5 in
+`saani init`, or alongside Claude for selected tiers (`llm.own.tiers`). Turn on
+`llm.record_traces` to collect training data from your real tasks.
+
 `saani init` stores your API key in the OS keychain (with the `secure` extra) or in a private file under `~/.saani`. It works with Anthropic (default: Opus plans, Sonnet works, Haiku for small jobs), OpenAI, or any OpenAI-compatible endpoint such as a local Ollama server, in which case nothing leaves your machine.
 
 Platform notes for voice: Linux needs PortAudio and a speech engine (`sudo apt install libportaudio2 espeak-ng`); macOS will ask for microphone permission the first time; the first run downloads the Whisper speech model (about 150 MB for `base`).
@@ -107,7 +114,7 @@ Add `--home <folder>` (or set `SAANI_HOME`) to use a different data folder.
 
 Run them yourself: `python -m unittest discover -s tests -t .` (or `pytest`) and `python -m evals.run_evals`.
 
-- **175 unit tests** pass. The original 168 were run on Python 3.10, 3.11 and 3.13; the 7 dashboard tests were added later and run on one Python version. They cover the policy, guard, vault, redaction, audit log, tools, both model providers (against a local stand-in server), planner, orchestrator, voice logic, scheduler, autostart file generation for all three systems, the background service and the CLI.
+- **181 unit tests** pass. The original 168 were run on Python 3.10, 3.11 and 3.13; the 13 dashboard and own-model tests were added later and run on one Python version. They cover the policy, guard, vault, redaction, audit log, tools, both model providers (against a local stand-in server), planner, orchestrator, voice logic, scheduler, autostart file generation for all three systems, the background service and the CLI.
 - **27 end-to-end scenarios** pass with a scripted model, including one that obeys every malicious instruction it is given. See [evals/REPORT.md](evals/REPORT.md).
 - The installed command was run for real on Linux: `saani demo`, the background service, a task submitted and approved through its API.
 

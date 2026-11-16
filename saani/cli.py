@@ -163,7 +163,8 @@ def cmd_init(cfg, a):
     print(f"Setting up Saani in {cfg.home}\n")
     cfg.set("user_name", input(f"Your name [{cfg.get('user_name') or getpass.getuser()}]: ").strip()
             or cfg.get("user_name") or getpass.getuser())
-    print("\nWhich model provider?\n  1) Anthropic (Claude)   2) OpenAI   3) Other OpenAI-compatible (Ollama, OpenRouter, Groq, ...)   4) Demo only")
+    print("\nWhich model provider?\n  1) Anthropic (Claude)   2) OpenAI   3) Other OpenAI-compatible (Ollama, OpenRouter, Groq, ...)"
+          "   4) Demo only   5) Your own model (saanimind server on this PC)")
     choice = input("Choose [1]: ").strip() or "1"
     vault = Vault(cfg.home)
     if choice == "1":
@@ -179,8 +180,18 @@ def cmd_init(cfg, a):
         cfg.set("llm.api_key_env", "SAANI_LLM_API_KEY")
         m = input("Model name (it must support tool calling): ").strip()
         cfg.set("llm.models", {"planner": m, "worker": m, "fast": m})
+    elif choice == "5":
+        cfg.set("llm.provider", "own")
+        cfg.set("llm.own.base_url", input("saanimind server URL [http://127.0.0.1:8900/v1]: ").strip()
+                or "http://127.0.0.1:8900/v1")
+        m = cfg.get("llm.own.model", "saanimind")
+        cfg.set("llm.models", {"planner": m, "worker": m, "fast": m})
+        print("Start the server with `saanimind serve` before giving Saani tasks.")
     else:
         cfg.set("llm.provider", "demo")
+    if choice in ("1", "2", "3"):
+        rec = input("\nRecord model exchanges (secrets scrubbed) as training data for your own model? [y/N]: ").strip().lower()
+        cfg.set("llm.record_traces", rec in ("y", "yes"))
     env = cfg.get("llm.api_key_env")
     if choice in ("1", "2", "3") and not os.environ.get(env):
         key = getpass.getpass(f"API key (stored in your {vault.backend} vault, hidden while typing; Enter to skip): ").strip()
