@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saani</title>
+<style>
+  :root { --bg:#f6f5f1; --panel:#ffffff; --ink:#1d1d1b; --mute:#6b6a65; --line:#e3e1da; --accent:#1f6f5c;
+          --warn:#a15c00; --danger:#b3261e; --ok:#1f6f5c; --chip:#efeee9; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#151614; --panel:#1e1f1c; --ink:#ecebe6; --mute:#9b9a94; --line:#30312d; --accent:#5fc3a8;
+            --warn:#e0a44a; --danger:#f2867f; --ok:#5fc3a8; --chip:#2a2b27; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display:flex; align-items:baseline; gap:14px; padding:18px 24px 6px; flex-wrap:wrap; }
+  h1 { margin:0; font-size:22px; letter-spacing:.2px; }
+  .meta { color:var(--mute); font-size:13px; }
+  main { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:18px; padding:12px 24px 40px; }
+  @media (max-width: 900px) { main { grid-template-columns:1fr; } }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  h2 { margin:0 0 10px; font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--mute); }
+  .ask { display:flex; gap:8px; }
+  textarea, input[type=text], input[type=password] { flex:1; width:100%; padding:10px 12px; border:1px solid var(--line);
+    border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; resize:vertical; }
+  button { padding:9px 14px; border:1px solid var(--line); border-radius:8px; background:var(--chip); color:var(--ink);
+           font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.no { color:var(--danger); }
+  button:disabled { opacity:.5; cursor:default; }
+  .card { border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:10px; }
+  .card.need { border-color:var(--warn); }
+  .card.need.DANGER { border-color:var(--danger); }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .chip { display:inline-block; padding:1px 8px; border-radius:99px; background:var(--chip); font-size:12px; color:var(--mute); }
+  .chip.done { color:var(--ok); } .chip.failed, .chip.DANGER { color:var(--danger); }
+  .chip.running, .chip.CAUTION, .chip.partial { color:var(--warn); }
+  pre { margin:8px 0 0; padding:10px; background:var(--bg); border-radius:8px; white-space:pre-wrap; word-break:break-word;
+        font:13px/1.45 ui-monospace, Consolas, monospace; max-height:340px; overflow:auto; }
+  .feed { font:12.5px/1.5 ui-monospace, Consolas, monospace; max-height:520px; overflow:auto; }
+  .feed div { padding:2px 0; border-bottom:1px dashed var(--line); word-break:break-word; }
+  .feed .a { color:var(--accent); }
+  .empty { color:var(--mute); font-size:14px; }
+  details summary { cursor:pointer; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="name">Saani</h1>
+  <span class="meta" id="status">connecting...</span>
+</header>
+<main>
+  <div>
+    <section>
+      <h2>Give a task</h2>
+      <div class="ask">
+        <textarea id="task" rows="2" placeholder="What should I do? (Ctrl+Enter to send)"></textarea>
+        <button id="mic" title="Speak (uses your browser's speech recognition)">Speak</button>
+        <button class="primary" id="go">Run</button>
+      </div>
+      <div class="ask" style="margin-top:8px">
+        <input type="text" id="dir" placeholder="Optional: project folder to work in (full path)">
+      </div>
+    </section>
+    <section style="margin-top:18px">
+      <h2>Needs you</h2>
+      <div id="pending"><div class="empty">Nothing is waiting for you.</div></div>
+    </section>
+    <section style="margin-top:18px">
+      <h2>Tasks</h2>
+      <div id="tasks"><div class="empty">No tasks yet.</div></div>
+    </section>
+  </div>
+  <div>
+    <section>
+      <h2>Live activity</h2>
+      <div class="feed" id="feed"></div>
+    </section>
+    <section style="margin-top:18px">
+      <h2>Schedules</h2>
+      <div id="schedules" class="empty">None. Add one with: saani schedule add</div>
+    </section>
+  </div>
+</main>
+<script>
+"use strict";
+let seq = 0, openTasks = new Set(), lastPendingKey = "", lastTasksKey = "";
+const $ = id => document.getElementById(id);
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+async function api(path, body) {
+  const opt = { headers: { "X-Requested-With": "saani", "X-Saani-Client": "dashboard" } };
+  if (body) { opt.method = "POST"; opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  const r = await fetch(path, opt);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+  return r.json();
+}
+function describe(ev) {
+  const k = ev.kind;
+  if (k === "task_started") return ["task", "started: " + ev.text];
+  if (k === "plan") return ["plan", ev.agents.length + " agent(s): " + ev.shape + (ev.skill ? "  (reusing skill " + ev.skill + ")" : "")];
+  if (k === "agent_started") return [ev.agent, "started"];
+  if (k === "tool_call") return [ev.agent, ev.tool + "  " + (ev.summary || "") + (ev.allowed ? "" : "   [not allowed]")];
+  if (k === "agent_finished") return [ev.agent, ev.status + " after " + ev.steps + " step(s)" + (ev.error ? " - " + ev.error : "")];
+  if (k === "attention") return ["needs you", ev.request_kind + (ev.tool ? ": " + ev.tool : "")];
+  if (k === "skill_saved") return ["learned", "saved skill " + ev.skill];
+  if (k === "verify_failed") return ["review", "found problems; fixing"];
+  if (k === "task_finished") return ["task", ev.status];
+  if (k === "notify") return [ev.agent || "note", ev.text];
+  if (k === "voice_error") return ["voice", ev.text];
+  return null;
+}
+function renderPending(list) {
+  const key = list.map(p => p.id).join(",");
+  if (key === lastPendingKey) return;      // do not wipe what the user is typing
+  lastPendingKey = key;
+  const box = $("pending"); box.textContent = "";
+  if (!list.length) { box.appendChild(el("div", "empty", "Nothing is waiting for you.")); return; }
+  for (const p of list) {
+    const c = el("div", "card need " + (p.risk || ""));
+    const head = el("div", "row");
+    if (p.kind === "approval") {
+      head.appendChild(el("span", "chip " + p.risk, p.risk));
+      head.appendChild(el("strong", "", p.agent + " wants to use " + p.tool));
+      c.appendChild(head);
+      c.appendChild(el("div", "meta", "Why this needs you: " + p.reason + (p.tainted ? "  (this agent has read web content)" : "")));
+      c.appendChild(el("pre", "", p.summary));
+      const row = el("div", "row"); row.style.marginTop = "10px";
+      const mk = (label, cls, allow, scope) => { const b = el("button", cls, label);
+        b.onclick = () => api("/api/approval", { id: p.id, allow, scope }).then(tick); row.appendChild(b); };
+      mk("Allow once", "primary", true, "once");
+      mk("Allow for this task", "", true, "task");
+      if (p.can_always) mk("Always allow", "", true, "always");
+      mk("Deny", "no", false, "once");
+      c.appendChild(row);
+    } else {
+      head.appendChild(el("span", "chip", p.kind));
+      head.appendChild(el("strong", "", (p.agent || "Saani") + " asks"));
+      c.appendChild(head);
+      c.appendChild(el("div", "", p.question));
+      const row = el("div", "ask"); row.style.marginTop = "10px";
+      const inp = el("input"); inp.type = p.kind === "secret" ? "password" : "text"; inp.autocomplete = "off";
+      const b = el("button", "primary", "Send");
+      const send = () => api("/api/answer", { id: p.id, text: inp.value }).then(tick);
+      b.onclick = send; inp.onkeydown = e => { if (e.key === "Enter") send(); };
+      row.appendChild(inp); row.appendChild(b); c.appendChild(row);
+    }
+    box.appendChild(c);
+  }
+}
+function renderTasks(list) {
+  const key = JSON.stringify(list.map(t => [t.id, t.status, (t.result || "").length]));
+  if (key === lastTasksKey) return;
+  lastTasksKey = key;
+  const box = $("tasks"); box.textContent = "";
+  if (!list.length) { box.appendChild(el("div", "empty", "No tasks yet.")); return; }
+  for (const t of list) {
+    const d = el("details", "card"); d.open = openTasks.has(t.id);
+    d.ontoggle = () => d.open ? openTasks.add(t.id) : openTasks.delete(t.id);
+    const s = el("summary");
+    s.appendChild(el("span", "chip " + t.status, t.status)); s.appendChild(document.createTextNode(" " + t.text));
+    d.appendChild(s);
+    const st = t.stats || {};
+    const bits = ["via " + t.source, new Date(t.created * 1000).toLocaleString()];
+    if (st.agents) bits.push(st.agents + " agent(s)");
+    if (st.llm_calls) bits.push(st.llm_calls + " model calls");
+    if (st.skill_used) bits.push("reused skill " + st.skill_used);
+    if (st.skill_saved) bits.push("learned skill " + st.skill_saved);
+    d.appendChild(el("div", "meta", bits.join("  |  ")));
+    if (t.result) d.appendChild(el("pre", "", t.result));
+    if (t.status === "running") { const b = el("button", "no", "Stop"); b.style.marginTop = "8px";
+      b.onclick = () => api("/api/cancel", { task_id: t.id }).then(tick); d.appendChild(b); }
+    box.appendChild(d);
+  }
+}
+async function tick() {
+  try {
+    const s = await api("/api/state?since=" + seq);
+    $("name").textContent = s.name; document.title = s.name + (s.pending.length ? " (" + s.pending.length + ")" : "");
+    $("status").textContent = "online  |  model: " + s.provider + "  |  permissions: " + s.mode + "  |  voice: " + s.voice +
+      "  |  " + s.skills + " skills, " + s.agents + " agent templates";
+    renderPending(s.pending); renderTasks(s.tasks);
+    const feed = $("feed");
+    for (const ev of s.events) {
+      seq = Math.max(seq, ev.seq);
+      const d = describe(ev); if (!d) continue;
+      const row = el("div"); row.appendChild(el("span", "a", "[" + d[0] + "] ")); row.appendChild(document.createTextNode(d[1]));
+      feed.prepend(row);
+    }
+    while (feed.childElementCount > 400) feed.lastChild.remove();
+    const sc = $("schedules");
+    if (s.schedules.length) { sc.className = ""; sc.textContent = "";
+      for (const x of s.schedules) sc.appendChild(el("div", "", x.name + "  (" + x.kind + " " + x.spec + ")  ->  " + x.task)); }
+  } catch (e) { $("status").textContent = "offline: " + e.message; }
+}
+function run() {
+  const text = $("task").value.trim(); if (!text) return;
+  api("/api/task", { text, dir: $("dir").value.trim() }).then(() => { $("task").value = ""; tick(); })
+    .catch(e => alert(e.message));
+}
+$("go").onclick = run;
+$("task").onkeydown = e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) run(); };
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SR) { $("mic").disabled = true; $("mic").title = "Speech recognition is not available in this browser"; }
+else $("mic").onclick = () => { const r = new SR(); r.lang = navigator.language || "en-US"; $("mic").textContent = "Listening";
+  r.onresult = e => { $("task").value = e.results[0][0].transcript; };
+  r.onend = () => { $("mic").textContent = "Speak"; }; r.start(); };
+tick(); setInterval(tick, 1500);
+</script>
+</body>
+</html>
