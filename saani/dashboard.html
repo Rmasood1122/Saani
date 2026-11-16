@@ -4,88 +4,213 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Saani</title>
+<link rel="icon" href="/assets/blackhole.png">
 <style>
-  :root { --bg:#f6f5f1; --panel:#ffffff; --ink:#1d1d1b; --mute:#6b6a65; --line:#e3e1da; --accent:#1f6f5c;
-          --warn:#a15c00; --danger:#b3261e; --ok:#1f6f5c; --chip:#efeee9; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#151614; --panel:#1e1f1c; --ink:#ecebe6; --mute:#9b9a94; --line:#30312d; --accent:#5fc3a8;
-            --warn:#e0a44a; --danger:#f2867f; --ok:#5fc3a8; --chip:#2a2b27; } }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  header { display:flex; align-items:baseline; gap:14px; padding:18px 24px 6px; flex-wrap:wrap; }
-  h1 { margin:0; font-size:22px; letter-spacing:.2px; }
-  .meta { color:var(--mute); font-size:13px; }
-  main { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:18px; padding:12px 24px 40px; }
-  @media (max-width: 900px) { main { grid-template-columns:1fr; } }
-  section { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; }
-  h2 { margin:0 0 10px; font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--mute); }
-  .ask { display:flex; gap:8px; }
-  textarea, input[type=text], input[type=password] { flex:1; width:100%; padding:10px 12px; border:1px solid var(--line);
-    border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; resize:vertical; }
-  button { padding:9px 14px; border:1px solid var(--line); border-radius:8px; background:var(--chip); color:var(--ink);
-           font:inherit; cursor:pointer; }
-  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
-  button.no { color:var(--danger); }
-  button:disabled { opacity:.5; cursor:default; }
-  .card { border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:10px; }
-  .card.need { border-color:var(--warn); }
-  .card.need.DANGER { border-color:var(--danger); }
+  :root { --ink:#eef2ff; --mute:#8d95b3; --dim:#5d6485; --glass:rgba(12,14,26,.66); --glass2:rgba(255,255,255,.035);
+          --line:rgba(255,190,130,.16); --line2:rgba(160,200,255,.13);
+          --amber:#ffb457; --amber2:#ff7a3d; --ice:#9fd8ff; --ok:#7fe3b5; --warn:#ffd27a; --danger:#ff7b8a; }
+  * { box-sizing:border-box; }
+  html, body { min-height:100%; }
+  body { margin:0; color:var(--ink); background:#03040a; overflow-x:hidden;
+         font:14.5px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  /* the black-hole picture sits behind everything, softened and darkened so text stays readable */
+  body::before { content:""; position:fixed; inset:-3%; z-index:-2; opacity:.9; filter:blur(2px) saturate(1.15);
+                 background:url(/assets/blackhole.png) center / cover no-repeat; }
+  body::after { content:""; position:fixed; inset:0; z-index:-1;
+                background:radial-gradient(ellipse at 50% 34%, rgba(3,4,10,0) 0%, rgba(3,4,10,.5) 55%, #03040a 100%); }
+
+  .top { display:flex; align-items:center; gap:14px; padding:18px 26px; flex-wrap:wrap; }
+  .orb { width:40px; height:40px; border-radius:50%; flex:none;
+         background:radial-gradient(circle, #03040a 40%, rgba(255,244,214,.95) 49%, rgba(255,170,80,.75) 58%, transparent 70%);
+         box-shadow:0 0 26px rgba(255,180,87,.55); }
+  .brand { font-weight:600; letter-spacing:.34em; text-transform:uppercase; font-size:14px; }
+  .pills { display:flex; gap:8px; flex-wrap:wrap; }
+  .pill { font-size:12px; padding:4px 11px; border-radius:99px; border:1px solid var(--line2);
+          background:rgba(8,10,20,.5); color:var(--mute); white-space:nowrap; }
+  .pill.ok::before { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:7px;
+                     background:var(--ok); box-shadow:0 0 8px var(--ok); vertical-align:middle; }
+  .spacer { flex:1; }
+  .ib { width:36px; height:36px; border-radius:50%; border:1px solid var(--line); background:var(--glass); color:var(--ink);
+        display:grid; place-items:center; cursor:pointer; font:500 15px/1 system-ui, sans-serif; padding:0; }
+  .ib:hover { border-color:rgba(255,190,130,.5); box-shadow:0 0 14px rgba(255,170,90,.25); }
+  .ib.sm { width:26px; height:26px; font-size:12px; color:var(--mute); }
+
+  .hero { max-width:860px; margin:12px auto 6px; padding:0 20px; text-align:center; }
+  .hero h1 { margin:0 0 6px; font-weight:300; font-size:30px; letter-spacing:.02em; }
+  .hero p { margin:0 0 20px; color:var(--mute); }
+  .cmd { display:flex; gap:10px; align-items:stretch; background:var(--glass); border:1px solid var(--line); border-radius:18px;
+         padding:10px; backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+         box-shadow:0 0 70px rgba(255,170,90,.12); }
+  .cmd textarea { flex:1; min-height:58px; resize:none; border:0; outline:none; background:transparent; color:var(--ink);
+                  font:inherit; padding:10px 12px; }
+  .cmd textarea::placeholder, input::placeholder { color:var(--dim); }
+  .cmd-dir { margin-top:10px; }
+  .cmd-dir input { width:100%; padding:9px 14px; border-radius:12px; border:1px solid var(--line2);
+                   background:rgba(8,10,20,.55); color:var(--ink); font:inherit; outline:none; }
+
+  .btn { padding:10px 18px; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.06);
+         color:var(--ink); font:inherit; cursor:pointer; }
+  .btn:hover { border-color:rgba(255,190,130,.45); }
+  .btn.primary { background:linear-gradient(135deg, var(--amber), var(--amber2)); border:0; color:#1a0d02; font-weight:600; }
+  .btn.no { color:var(--danger); }
+  .btn:disabled { opacity:.45; cursor:default; }
+
+  .grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:18px; max-width:1400px;
+          margin:0 auto; padding:22px 26px 44px; }
+  @media (max-width: 940px) { .grid { grid-template-columns:1fr; } }
+  .panel { background:var(--glass); border:1px solid var(--line); border-radius:18px; padding:16px 18px;
+           backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); box-shadow:0 0 44px rgba(255,170,90,.06); }
+  .panel.glow { border-color:rgba(255,190,87,.55); box-shadow:0 0 30px rgba(255,170,80,.18); }
+  .ph { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .ph h2 { flex:1; margin:0; font-size:12px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:var(--mute); }
+  .count { font-size:12px; color:var(--dim); }
+  .empty { color:var(--dim); font-size:14px; padding:6px 2px; }
+
+  .card { border:1px solid var(--line2); background:var(--glass2); border-radius:14px; padding:12px 14px; margin-bottom:10px; }
+  .card.need { border-color:rgba(255,190,87,.45); }
+  .card.need.DANGER { border-color:rgba(255,123,138,.6); }
+  .task summary { list-style:none; cursor:pointer; display:flex; gap:10px; align-items:center; }
+  .task summary::-webkit-details-marker { display:none; }
+  .task .txt { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .task .more { font-size:12px; color:var(--dim); border:1px solid var(--line2); border-radius:99px; padding:1px 9px; white-space:nowrap; }
+  .task[open] .more::after { content:" (hide)"; }
+  .task .details { margin-top:10px; color:var(--mute); font-size:13px; }
   .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .chip { display:inline-block; padding:1px 8px; border-radius:99px; background:var(--chip); font-size:12px; color:var(--mute); }
-  .chip.done { color:var(--ok); } .chip.failed, .chip.DANGER { color:var(--danger); }
-  .chip.running, .chip.CAUTION, .chip.partial { color:var(--warn); }
-  pre { margin:8px 0 0; padding:10px; background:var(--bg); border-radius:8px; white-space:pre-wrap; word-break:break-word;
-        font:13px/1.45 ui-monospace, Consolas, monospace; max-height:340px; overflow:auto; }
-  .feed { font:12.5px/1.5 ui-monospace, Consolas, monospace; max-height:520px; overflow:auto; }
-  .feed div { padding:2px 0; border-bottom:1px dashed var(--line); word-break:break-word; }
-  .feed .a { color:var(--accent); }
-  .empty { color:var(--mute); font-size:14px; }
-  details summary { cursor:pointer; }
+  .meta { color:var(--mute); font-size:13px; }
+
+  .chip { display:inline-block; padding:2px 9px; border-radius:99px; font-size:11.5px; white-space:nowrap;
+          background:rgba(255,255,255,.06); color:var(--mute); }
+  .chip.done { color:var(--ok); background:rgba(127,227,181,.1); }
+  .chip.running { color:var(--ice); background:rgba(159,216,255,.1); }
+  .chip.failed, .chip.DANGER { color:var(--danger); background:rgba(255,123,138,.1); }
+  .chip.partial, .chip.CAUTION, .chip.approval, .chip.secret, .chip.question { color:var(--warn); background:rgba(255,210,122,.1); }
+
+  pre { margin:10px 0 0; padding:12px; border-radius:12px; background:rgba(0,0,8,.5); border:1px solid var(--line2);
+        white-space:pre-wrap; word-break:break-word; color:#dfe6ff; max-height:320px; overflow:auto;
+        font:12.5px/1.5 Consolas, ui-monospace, monospace; }
+  .feed { max-height:430px; overflow:auto; font:12.5px/1.6 Consolas, ui-monospace, monospace; color:#c9d2ee; }
+  .feed div { padding:3px 0; border-bottom:1px dashed rgba(255,255,255,.06); word-break:break-word; }
+  .feed .a { color:var(--amber); }
+  .stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .stat { border:1px solid var(--line2); border-radius:12px; padding:10px 12px; background:var(--glass2); }
+  .stat b { display:block; font-weight:500; font-size:20px; }
+  .stat span { font-size:12px; color:var(--mute); }
+
+  input[type=text], input[type=password], select { width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--line2);
+    background:rgba(8,10,20,.6); color:var(--ink); font:inherit; outline:none; }
+  input[type=text]:focus, input[type=password]:focus, select:focus, .cmd:focus-within { border-color:rgba(255,190,130,.5); }
+  select option { background:#141628; color:var(--ink); }
+
+  .scrim { position:fixed; inset:0; z-index:10; display:none; align-items:center; justify-content:center; padding:20px;
+           background:rgba(2,3,8,.6); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+  .scrim.open { display:flex; }
+  .modal { width:min(520px, 100%); max-height:88vh; overflow:auto; padding:24px; border-radius:20px;
+           background:rgba(14,16,30,.96); border:1px solid var(--line); box-shadow:0 0 90px rgba(255,170,90,.16); }
+  .modal h3 { margin:0 0 12px; font-weight:500; font-size:20px; }
+  .modal p { color:var(--mute); margin:0 0 12px; }
+  .modal .sec { margin:0 0 16px; }
+  .modal .sec b { display:block; margin-bottom:3px; color:var(--ink); font-weight:600; }
+  .field { margin-bottom:14px; }
+  .field > label { display:block; font-size:12.5px; color:var(--mute); margin-bottom:5px; }
+  .toggle { display:flex; gap:10px; align-items:center; margin:10px 0; color:var(--ink); }
+  .toggle input { width:17px; height:17px; accent-color:var(--amber); }
+  .ro { font-size:13px; color:var(--mute); margin:6px 0 4px; }
+  .msg { font-size:13px; color:var(--mute); min-height:18px; margin-top:6px; }
+  .foot { display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }
+  .ask { display:flex; gap:8px; }
+  .ask input { flex:1; }
 </style>
 </head>
 <body>
-<header>
-  <h1 id="name">Saani</h1>
-  <span class="meta" id="status">connecting...</span>
-</header>
-<main>
+<div class="top">
+  <div class="orb" aria-hidden="true"></div>
+  <div class="brand" id="name">Saani</div>
+  <div class="pills" id="pills"></div>
+  <div class="spacer"></div>
+  <button class="ib" id="btn-info" title="What am I looking at?" aria-label="About this screen">i</button>
+  <button class="ib" id="btn-settings" title="Settings" aria-label="Settings">&#9881;</button>
+</div>
+
+<section class="hero">
+  <h1>What should Saani do?</h1>
+  <p>Type or speak a task. Saani plans it, runs it, and asks you before anything sensitive.</p>
+  <div class="cmd">
+    <textarea id="task" rows="2" placeholder="Describe the task (Ctrl+Enter to send)"></textarea>
+    <button class="btn" id="mic" title="Speak your task">Speak</button>
+    <button class="btn primary" id="go">Run</button>
+  </div>
+  <div class="cmd-dir"><input type="text" id="dir" placeholder="Optional: project folder to work in (full path)"></div>
+</section>
+
+<main class="grid">
   <div>
-    <section>
-      <h2>Give a task</h2>
-      <div class="ask">
-        <textarea id="task" rows="2" placeholder="What should I do? (Ctrl+Enter to send)"></textarea>
-        <button id="mic" title="Speak (uses your browser's speech recognition)">Speak</button>
-        <button class="primary" id="go">Run</button>
-      </div>
-      <div class="ask" style="margin-top:8px">
-        <input type="text" id="dir" placeholder="Optional: project folder to work in (full path)">
-      </div>
-    </section>
-    <section style="margin-top:18px">
-      <h2>Needs you</h2>
+    <section class="panel" id="needs-panel">
+      <div class="ph"><h2>Needs you</h2><span class="count" id="needs-count"></span>
+        <button class="ib sm" data-info="needs" title="About this">i</button></div>
       <div id="pending"><div class="empty">Nothing is waiting for you.</div></div>
     </section>
-    <section style="margin-top:18px">
-      <h2>Tasks</h2>
+    <section class="panel" style="margin-top:18px">
+      <div class="ph"><h2>Tasks</h2><span class="count" id="tasks-count"></span>
+        <button class="ib sm" data-info="tasks" title="About this">i</button></div>
       <div id="tasks"><div class="empty">No tasks yet.</div></div>
     </section>
   </div>
   <div>
-    <section>
-      <h2>Live activity</h2>
+    <section class="panel">
+      <div class="ph"><h2>Overview</h2><button class="ib sm" data-info="overview" title="About this">i</button></div>
+      <div class="stats">
+        <div class="stat"><b id="st-uptime">-</b><span>running for</span></div>
+        <div class="stat"><b id="st-skills">0</b><span>skills learned</span></div>
+        <div class="stat"><b id="st-agents">0</b><span>agent templates</span></div>
+        <div class="stat"><b id="st-mode">-</b><span>permissions</span></div>
+      </div>
+    </section>
+    <section class="panel" style="margin-top:18px">
+      <div class="ph"><h2>Live activity</h2><button class="ib sm" data-info="feed" title="About this">i</button></div>
       <div class="feed" id="feed"></div>
     </section>
-    <section style="margin-top:18px">
-      <h2>Schedules</h2>
+    <section class="panel" style="margin-top:18px">
+      <div class="ph"><h2>Schedules</h2><button class="ib sm" data-info="schedules" title="About this">i</button></div>
       <div id="schedules" class="empty">None. Add one with: saani schedule add</div>
     </section>
   </div>
 </main>
+
+<!-- info dialog -->
+<div class="scrim" id="info-scrim">
+  <div class="modal" role="dialog" aria-labelledby="info-title">
+    <h3 id="info-title"></h3>
+    <div id="info-body"></div>
+    <div class="foot"><button class="btn" data-close>Close</button></div>
+  </div>
+</div>
+
+<!-- settings dialog -->
+<div class="scrim" id="settings-scrim">
+  <div class="modal" role="dialog" aria-labelledby="settings-title">
+    <h3 id="settings-title">Settings</h3>
+    <div class="field"><label for="s-name">Name shown at the top</label><input type="text" id="s-name" maxlength="40"></div>
+    <div class="field">
+      <label for="s-mode">Permissions</label>
+      <select id="s-mode">
+        <option value="ask">Ask (recommended): stop for sensitive actions</option>
+        <option value="strict">Strict: stop for more actions</option>
+      </select>
+    </div>
+    <label class="toggle"><input type="checkbox" id="s-attn"> Open the dashboard when Saani needs me</label>
+    <label class="toggle"><input type="checkbox" id="s-start"> Open the dashboard when Saani starts</label>
+    <div class="ro" id="s-ro"></div>
+    <div class="msg" id="s-msg"></div>
+    <div class="foot"><button class="btn" data-close>Cancel</button><button class="btn primary" id="s-save">Save</button></div>
+  </div>
+</div>
+
 <script>
 "use strict";
 let seq = 0, openTasks = new Set(), lastPendingKey = "", lastTasksKey = "";
 const $ = id => document.getElementById(id);
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+function pill(text, cls, title) { const p = el("span", "pill " + (cls || ""), text); if (title) p.title = title; return p; }
 async function api(path, body) {
   const opt = { headers: { "X-Requested-With": "saani", "X-Saani-Client": "dashboard" } };
   if (body) { opt.method = "POST"; opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
@@ -93,6 +218,21 @@ async function api(path, body) {
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
   return r.json();
 }
+const INFO = {
+  overview: ["Overview", "How long Saani has been running, how many skills it has learned from past work, how many agent templates it can reuse, and the permission level it is using."],
+  needs: ["Needs you", "Saani stops and waits here when an action is sensitive or when it needs a detail only you know. Allow once, allow for this task, or deny. Nothing sensitive runs until you answer. A password you type here goes to the secret vault; agents only ever see its name."],
+  tasks: ["Tasks", "Everything you have asked Saani to do, newest first. Open a task to see how it ran: the agents it used, the model calls, any skill it reused or learned, and the result. Stop cancels a task that is still running."],
+  feed: ["Live activity", "A running log of what Saani is doing: the plan it chose, each agent's steps, the tools it used and anything that needed your decision. Use the Tasks panel for the full result of each job."],
+  schedules: ["Schedules", "Tasks Saani runs on its own at set times. Add one from the terminal with: saani schedule add"],
+  settings: ["Settings", "Change your name and the permission level here. Permission levels: Ask stops for sensitive actions; Strict stops for more of them. The model, API key and voice are set in the terminal with: saani init"]
+};
+function showInfo(key) {
+  const [title, text] = INFO[key];
+  $("info-title").textContent = title; $("info-body").textContent = "";
+  $("info-body").appendChild(el("p", "", text));
+  $("info-scrim").classList.add("open");
+}
+function closeModals() { document.querySelectorAll(".scrim.open").forEach(s => s.classList.remove("open")); }
 function describe(ev) {
   const k = ev.kind;
   if (k === "task_started") return ["task", "started: " + ev.text];
@@ -124,7 +264,7 @@ function renderPending(list) {
       c.appendChild(el("div", "meta", "Why this needs you: " + p.reason + (p.tainted ? "  (this agent has read web content)" : "")));
       c.appendChild(el("pre", "", p.summary));
       const row = el("div", "row"); row.style.marginTop = "10px";
-      const mk = (label, cls, allow, scope) => { const b = el("button", cls, label);
+      const mk = (label, cls, allow, scope) => { const b = el("button", "btn " + cls, label);
         b.onclick = () => api("/api/approval", { id: p.id, allow, scope }).then(tick); row.appendChild(b); };
       mk("Allow once", "primary", true, "once");
       mk("Allow for this task", "", true, "task");
@@ -132,13 +272,13 @@ function renderPending(list) {
       mk("Deny", "no", false, "once");
       c.appendChild(row);
     } else {
-      head.appendChild(el("span", "chip", p.kind));
+      head.appendChild(el("span", "chip " + p.kind, p.kind));
       head.appendChild(el("strong", "", (p.agent || "Saani") + " asks"));
       c.appendChild(head);
       c.appendChild(el("div", "", p.question));
       const row = el("div", "ask"); row.style.marginTop = "10px";
       const inp = el("input"); inp.type = p.kind === "secret" ? "password" : "text"; inp.autocomplete = "off";
-      const b = el("button", "primary", "Send");
+      const b = el("button", "btn primary", "Send");
       const send = () => api("/api/answer", { id: p.id, text: inp.value }).then(tick);
       b.onclick = send; inp.onkeydown = e => { if (e.key === "Enter") send(); };
       row.appendChild(inp); row.appendChild(b); c.appendChild(row);
@@ -153,10 +293,12 @@ function renderTasks(list) {
   const box = $("tasks"); box.textContent = "";
   if (!list.length) { box.appendChild(el("div", "empty", "No tasks yet.")); return; }
   for (const t of list) {
-    const d = el("details", "card"); d.open = openTasks.has(t.id);
+    const d = el("details", "card task"); d.open = openTasks.has(t.id);
     d.ontoggle = () => d.open ? openTasks.add(t.id) : openTasks.delete(t.id);
     const s = el("summary");
-    s.appendChild(el("span", "chip " + t.status, t.status)); s.appendChild(document.createTextNode(" " + t.text));
+    s.appendChild(el("span", "chip " + t.status, t.status));
+    s.appendChild(el("span", "txt", t.text));
+    s.appendChild(el("span", "more", "Details"));
     d.appendChild(s);
     const st = t.stats || {};
     const bits = ["via " + t.source, new Date(t.created * 1000).toLocaleString()];
@@ -164,19 +306,32 @@ function renderTasks(list) {
     if (st.llm_calls) bits.push(st.llm_calls + " model calls");
     if (st.skill_used) bits.push("reused skill " + st.skill_used);
     if (st.skill_saved) bits.push("learned skill " + st.skill_saved);
-    d.appendChild(el("div", "meta", bits.join("  |  ")));
-    if (t.result) d.appendChild(el("pre", "", t.result));
-    if (t.status === "running") { const b = el("button", "no", "Stop"); b.style.marginTop = "8px";
-      b.onclick = () => api("/api/cancel", { task_id: t.id }).then(tick); d.appendChild(b); }
+    const det = el("div", "details");
+    det.appendChild(el("div", "meta", bits.join("  |  ")));
+    if (t.result) det.appendChild(el("pre", "", t.result));
+    if (t.status === "running") { const b = el("button", "btn no", "Stop"); b.style.marginTop = "10px";
+      b.onclick = () => api("/api/cancel", { task_id: t.id }).then(tick); det.appendChild(b); }
+    d.appendChild(det);
     box.appendChild(d);
   }
 }
+function fmtUp(s) { s = Math.max(0, s | 0); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return h ? h + "h " + m + "m" : m + "m " + (s % 60) + "s"; }
 async function tick() {
   try {
     const s = await api("/api/state?since=" + seq);
     $("name").textContent = s.name; document.title = s.name + (s.pending.length ? " (" + s.pending.length + ")" : "");
-    $("status").textContent = "online  |  model: " + s.provider + "  |  permissions: " + s.mode + "  |  voice: " + s.voice +
-      "  |  " + s.skills + " skills, " + s.agents + " agent templates";
+    const pills = $("pills"); pills.textContent = "";
+    pills.appendChild(pill("online", "ok"));
+    pills.appendChild(pill("model: " + s.provider));
+    pills.appendChild(pill("permissions: " + s.mode));
+    const vo = String(s.voice || "");
+    pills.appendChild(pill("voice: " + (vo.split(":")[0] || "off"), "", vo));
+    $("st-uptime").textContent = fmtUp(s.uptime); $("st-skills").textContent = s.skills;
+    $("st-agents").textContent = s.agents; $("st-mode").textContent = s.mode;
+    $("needs-count").textContent = s.pending.length ? s.pending.length + " waiting" : "";
+    $("needs-panel").classList.toggle("glow", s.pending.length > 0);
+    $("tasks-count").textContent = s.tasks.length ? s.tasks.length + " total" : "";
     renderPending(s.pending); renderTasks(s.tasks);
     const feed = $("feed");
     for (const ev of s.events) {
@@ -189,7 +344,29 @@ async function tick() {
     const sc = $("schedules");
     if (s.schedules.length) { sc.className = ""; sc.textContent = "";
       for (const x of s.schedules) sc.appendChild(el("div", "", x.name + "  (" + x.kind + " " + x.spec + ")  ->  " + x.task)); }
-  } catch (e) { $("status").textContent = "offline: " + e.message; }
+  } catch (e) { $("pills").textContent = ""; $("pills").appendChild(pill("offline: " + e.message)); }
+}
+async function openSettings() {
+  $("s-msg").textContent = "";
+  try {
+    const s = await api("/api/settings");
+    $("s-name").value = s.name;
+    const trusted = s.mode === "trusted";
+    $("s-mode").disabled = trusted;
+    $("s-mode").value = trusted ? "ask" : s.mode;
+    $("s-attn").checked = s.open_on_attention;
+    $("s-start").checked = s.open_on_start;
+    $("s-ro").textContent = "Model: " + s.provider + ".  Voice: " + s.voice + "." +
+      (trusted ? "  Permissions are set to trusted in the terminal; change them there." : "") +
+      "  To change the model or API key, run: saani init";
+  } catch (e) { $("s-msg").textContent = e.message; }
+  $("settings-scrim").classList.add("open");
+}
+function saveSettings() {
+  const body = { name: $("s-name").value.trim(), open_on_attention: $("s-attn").checked, open_on_start: $("s-start").checked };
+  if (!$("s-mode").disabled) body.mode = $("s-mode").value;
+  api("/api/settings", body).then(() => { $("s-msg").textContent = "Saved."; tick(); })
+    .catch(e => { $("s-msg").textContent = e.message; });
 }
 function run() {
   const text = $("task").value.trim(); if (!text) return;
@@ -198,6 +375,13 @@ function run() {
 }
 $("go").onclick = run;
 $("task").onkeydown = e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) run(); };
+$("btn-info").onclick = () => showInfo("overview");
+$("btn-settings").onclick = openSettings;
+$("s-save").onclick = saveSettings;
+document.querySelectorAll("[data-info]").forEach(b => b.onclick = () => showInfo(b.dataset.info));
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = closeModals);
+document.querySelectorAll(".scrim").forEach(s => s.addEventListener("click", e => { if (e.target === s) closeModals(); }));
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModals(); });
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (!SR) { $("mic").disabled = true; $("mic").title = "Speech recognition is not available in this browser"; }
 else $("mic").onclick = () => { const r = new SR(); r.lang = navigator.language || "en-US"; $("mic").textContent = "Listening";

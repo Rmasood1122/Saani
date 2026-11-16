@@ -231,6 +231,24 @@ def cmd_open(cfg, a):
     return 0
 
 
+def cmd_window(cfg, a):
+    """Show the dashboard in its own desktop window (needs the optional 'window' extra)."""
+    from .daemon import call_daemon, dashboard_url
+    if not call_daemon(cfg, "/api/health", timeout=2):
+        print("Saani is not running. Start it with:  saani daemon")
+        return 1
+    try:
+        import webview  # provided by pywebview
+    except ImportError:
+        print('The desktop window needs one extra package:  pip install "saani[window]"\n'
+              "Or open the dashboard in your browser instead:  saani open")
+        return 1
+    webview.create_window("Saani", dashboard_url(cfg), width=1320, height=860, min_size=(960, 640),
+                          background_color="#03040a")
+    webview.start()
+    return 0
+
+
 def cmd_status(cfg, a):
     from .daemon import call_daemon
     s = call_daemon(cfg, "/api/state?since=999999999")
@@ -582,7 +600,8 @@ def build_parser() -> argparse.ArgumentParser:
     add("demo", cmd_demo, "offline demonstration (no API key needed)")
     sp = add("daemon", cmd_daemon, "run the background service (voice, dashboard, schedules)")
     sp.add_argument("--no-voice", action="store_true")
-    add("open", cmd_open, "open the dashboard")
+    add("open", cmd_open, "open the dashboard in your browser")
+    add("window", cmd_window, "show Saani in its own desktop window")
     add("status", cmd_status, "is the background service running?")
     add("stop", cmd_stop, "stop the background service")
     sp = add("submit", cmd_submit, "hand a task to the background service")

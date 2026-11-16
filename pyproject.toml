@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "saani"
-version = "1.0.0"
+version = "1.1.0"
 description = "Saani - a personal multi-agent AI system that works on your computer the way you would."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,7 +14,8 @@ dependencies = []
 voice = ["sounddevice", "numpy", "faster-whisper", "pyttsx3"]
 desktop = ["pyautogui", "pillow"]
 secure = ["keyring"]
-all = ["sounddevice", "numpy", "faster-whisper", "pyttsx3", "pyautogui", "pillow", "keyring"]
+window = ["pywebview"]
+all = ["sounddevice", "numpy", "faster-whisper", "pyttsx3", "pyautogui", "pillow", "keyring", "pywebview"]
 
 [project.scripts]
 saani = "saani.cli:main"
@@ -23,4 +24,4 @@ saani = "saani.cli:main"
 include = ["saani*"]
 
 [tool.setuptools.package-data]
-saani = ["*.html"]
+saani = ["*.html", "assets/*.png"]

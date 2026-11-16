@@ -6,15 +6,25 @@ It has no required dependencies beyond Python 3.10+. Voice, desktop control and 
 
 ## Install
 
-```bash
-cd saani
+Run these from the `saani` folder. They call the environment's Python directly, so no activation step is needed.
+
+```powershell
+# Windows (PowerShell)
 python -m venv .venv
-# Windows:      .venv\Scripts\activate
-# macOS/Linux:  source .venv/bin/activate
-pip install ".[all]"        # or "." for the core only; extras: voice, desktop, secure
-saani init                  # model + API key, 7 questions about how you work, start-at-login
-saani doctor                # shows what is ready and what is missing
+.venv\Scripts\python -m pip install ".[all]"     # or "." for the core only; extras: voice, desktop, secure, window
+.venv\Scripts\saani init        # model + API key, 7 questions about how you work, start-at-login
+.venv\Scripts\saani doctor      # shows what is ready and what is missing
 ```
+
+```bash
+# macOS / Linux
+python3 -m venv .venv
+.venv/bin/python -m pip install ".[all]"
+.venv/bin/saani init
+.venv/bin/saani doctor
+```
+
+The voice extra needs Python 3.12 or 3.13 on Windows at the moment (some speech packages have no ready-made builds for newer Python yet). On a newer Python, install the core and the other extras, and leave voice off.
 
 `saani init` stores your API key in the OS keychain (with the `secure` extra) or in a private file under `~/.saani`. It works with Anthropic (default: Opus plans, Sonnet works, Haiku for small jobs), OpenAI, or any OpenAI-compatible endpoint such as a local Ollama server, in which case nothing leaves your machine.
 
@@ -27,7 +37,8 @@ Try it without an API key: `saani demo` replays a scripted model so you can watc
 | You want to | Do this |
 |---|---|
 | Talk to it | Log in. The background service is already running. Say **"Saani, fix the failing tests in my shop project."** Saying just "Saani" makes it answer "Yes?" and wait for the request. "Saani, stop everything" cancels. |
-| Type to it | `saani run "..."` for one task in the terminal, `saani chat` for a session, or the dashboard (`saani open`). |
+| Type to it | `saani run "..."` for one task in the terminal, `saani chat` for a session, or the dashboard. |
+| Look at it | `saani window` shows Saani in its own desktop window (needs the `window` extra). `saani open` opens the same dashboard in your browser for more detail. Settings and the info buttons are in both. |
 | Work inside a project | `saani run --dir ~/projects/shop "..."`, or mark folders as yours once: `saani trust add ~/projects/shop`. Agents may edit files there without asking. |
 | Hand off and walk away | `saani submit "..."` queues it with the background service. |
 | Run something on a schedule | `saani schedule add ai-news "Research today's AI news and write my brief" --weekdays 08:30` |
@@ -88,7 +99,7 @@ Read [docs/SECURITY.md](docs/SECURITY.md) before switching to `trusted` mode. It
 
 ## Commands
 
-`init` · `doctor` · `demo` · `run` · `chat` · `daemon` · `open` · `status` · `stop` · `submit` · `listen` (test the microphone) · `autostart install|remove|status` · `persona show|init|add|path` · `feedback` · `skills` · `agents` · `tools` · `memory search|add` · `schedule add|list|remove` · `secret set|list|delete` · `trust add|remove|list` · `rules` · `check` · `trash` · `audit tail|verify` · `history` · `config get|set`
+`init` · `doctor` · `demo` · `run` · `chat` · `daemon` · `open` · `window` · `status` · `stop` · `submit` · `listen` (test the microphone) · `autostart install|remove|status` · `persona show|init|add|path` · `feedback` · `skills` · `agents` · `tools` · `memory search|add` · `schedule add|list|remove` · `secret set|list|delete` · `trust add|remove|list` · `rules` · `check` · `trash` · `audit tail|verify` · `history` · `config get|set`
 
 Add `--home <folder>` (or set `SAANI_HOME`) to use a different data folder.
 
@@ -96,7 +107,7 @@ Add `--home <folder>` (or set `SAANI_HOME`) to use a different data folder.
 
 Run them yourself: `python -m unittest discover -s tests -t .` (or `pytest`) and `python -m evals.run_evals`.
 
-- **168 unit tests** pass on Python 3.10, 3.11 and 3.13, covering the policy, guard, vault, redaction, audit log, tools, both model providers (against a local stand-in server), planner, orchestrator, voice logic, scheduler, autostart file generation for all three systems, the background service and the CLI.
+- **175 unit tests** pass. The original 168 were run on Python 3.10, 3.11 and 3.13; the 7 dashboard tests were added later and run on one Python version. They cover the policy, guard, vault, redaction, audit log, tools, both model providers (against a local stand-in server), planner, orchestrator, voice logic, scheduler, autostart file generation for all three systems, the background service and the CLI.
 - **27 end-to-end scenarios** pass with a scripted model, including one that obeys every malicious instruction it is given. See [evals/REPORT.md](evals/REPORT.md).
 - The installed command was run for real on Linux: `saani demo`, the background service, a task submitted and approved through its API.
 
@@ -105,7 +116,7 @@ Not tested, because it needs your machine or your key:
 - **A real model.** No API key was available in the build environment, so no real model has ever driven this system. `python -m evals.live_eval` runs six real tasks (a bug fix, a data report, a refusal, a prompt-injection page, a persona check) against your model. Run it first; it costs a few cents.
 - **A real microphone and speakers.** The wake-word and speech pipeline is tested with synthetic audio and a fake recogniser. Check yours with `saani listen`.
 - **Windows and macOS.** Start-at-login, PowerShell handling and the speech commands for those systems are tested with fakes on Linux only.
-- **Real mouse and keyboard control**, and the **dashboard in a browser** (its API is tested and its script is syntax-checked; nobody has looked at it).
+- **Real mouse and keyboard control**, and the **desktop window** (`saani window`) on Windows. The dashboard was rendered and clicked through in headless Chrome on Linux (no script errors, settings and info dialogs work); it has not been seen on Windows.
 - **Web search results.** The DuckDuckGo result parser is tested against a hand-written sample, not the live site.
 
 ## Limits

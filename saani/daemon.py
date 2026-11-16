@@ -44,6 +44,12 @@ def load_token(home: Path) -> str:
     return tok
 
 
+ASSET_DIR = Path(__file__).parent / "assets"
+ASSET_BACKGROUND = (ASSET_DIR / "blackhole.png").read_bytes() if (ASSET_DIR / "blackhole.png").exists() else b""
+# The web UI may change these. "trusted" is deliberately not on the list: it is set in the terminal only.
+WEB_SETTABLE_MODES = ("strict", "ask")
+
+
 def dashboard_url(config: Config) -> str:
     return (f"http://{config.get('daemon.host', '127.0.0.1')}:{config.get('daemon.port', 8765)}"
             f"/?token={load_token(config.home)}")
@@ -117,6 +123,32 @@ class Daemon:
                 "events": self.svc.events.since(since, 200),
                 "schedules": self.svc.store.schedule_list(),
                 "skills": len(self.svc.skills.all()), "agents": len(self.svc.agents.all())}
+
+    def settings(self) -> dict:
+        return {"name": self.config.get("name", "Saani"), "mode": self.config.get("security.mode", "ask"),
+                "provider": self.config.get("llm.provider"), "voice": self.voice_status,
+                "open_on_attention": bool(self.config.get("daemon.open_dashboard_on_attention", True)),
+                "open_on_start": bool(self.config.get("daemon.open_dashboard_on_start", False))}
+
+    def update_settings(self, body: dict) -> dict:
+        """Apply the few settings the web UI may change. Raises ValueError for anything else."""
+        if "name" in body:
+            name = str(body["name"]).strip()[:40]
+            if not name:
+                raise ValueError("the name cannot be empty")
+            self.config.set("name", name)
+        if "mode" in body:
+            if body["mode"] not in WEB_SETTABLE_MODES:
+                raise ValueError("permissions can be set to strict or ask here; trusted is set in the terminal")
+            self.config.set("security.mode", body["mode"])
+        for key, field in (("daemon.open_dashboard_on_attention", "open_on_attention"),
+                           ("daemon.open_dashboard_on_start", "open_on_start")):
+            if field in body:
+                if not isinstance(body[field], bool):
+                    raise ValueError(f"{field} must be true or false")
+                self.config.set(key, body[field])
+        self.config.save()
+        return self.settings()
 
     # ---- events: log + speech ------------------------------------------------
     def _on_event(self, ev: dict) -> None:
@@ -284,6 +316,12 @@ def make_handler(d: Daemon):
             q = parse_qs(u.query)
             if u.path == "/api/health":
                 return self._json(200, {"ok": True, "name": d.config.get("name", "Saani")})
+            if u.path == "/assets/blackhole.png":      # public picture only; no data
+                if not ASSET_BACKGROUND:
+                    return self._json(404, {"error": "not found"})
+                return self._send(200, ASSET_BACKGROUND, "image/png")
+            if u.path == "/api/settings" and self._authed():
+                return self._json(200, d.settings())
             if u.path == "/":
                 given = (q.get("token") or [""])[0]
                 if given and hmac.compare_digest(given.encode(), d.token.encode()):
@@ -336,6 +374,11 @@ def make_handler(d: Daemon):
                 return self._json(200 if ok else 404, {"ok": ok})
             if path == "/api/cancel":
                 return self._json(200, {"ok": d.orch.cancel(str(body.get("task_id", "")))})
+            if path == "/api/settings":
+                try:
+                    return self._json(200, d.update_settings(body))
+                except ValueError as e:
+                    return self._json(400, {"error": str(e)})
             if path == "/api/shutdown":
                 self._json(200, {"ok": True})
                 return d.shutdown()
